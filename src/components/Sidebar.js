@@ -49,9 +49,18 @@ export default function Sidebar({ activeSection }) {
   ]
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    try {
+      await supabase.auth.signOut()
+      // Clear any local storage data
+      localStorage.removeItem('userEmail')
+      localStorage.removeItem('systemSettings')
+      // Force redirect to login page
+      window.location.href = '/login'
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Still redirect even if signOut fails
+      window.location.href = '/login'
+    }
   }
 
   return (
@@ -78,11 +87,10 @@ export default function Sidebar({ activeSection }) {
             <Link
               key={item.id}
               href={item.href}
-              className={`group flex items-center space-x-4 px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-200 ${
-                activeSection === item.id
-                  ? 'bg-white/10 text-white' 
+              className={`group flex items-center space-x-4 px-4 py-3.5 rounded-xl text-base font-medium transition-all duration-200 ${activeSection === item.id
+                  ? 'bg-white/10 text-white'
                   : 'text-white/70 hover:bg-white/5 hover:text-white'
-              }`}
+                }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
@@ -90,7 +98,7 @@ export default function Sidebar({ activeSection }) {
               <span>{item.label}</span>
             </Link>
           ))}
-          
+
           {/* Logout */}
           <button
             onClick={handleLogout}

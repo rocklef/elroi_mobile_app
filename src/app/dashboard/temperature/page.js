@@ -193,6 +193,13 @@ export default function TemperaturePage() {
   const [showDangerModal, setShowDangerModal] = useState(false)
   const [dangerModalData, setDangerModalData] = useState(null)
 
+  // Top Countdown Bar State (appears after acknowledging modal)
+  const [showTopCountdownBar, setShowTopCountdownBar] = useState(false)
+  const [topBarAlertType, setTopBarAlertType] = useState(null) // 'warning' | 'danger'
+  const [topBarMessage, setTopBarMessage] = useState('') // Alert message text
+  const [topBarContact, setTopBarContact] = useState({ name: '', email: '' }) // Contact info
+  const [thresholdAlertSent, setThresholdAlertSent] = useState(false) // separate flag for threshold
+
   // Live Excel Data State
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [temperatureReadings, setTemperatureReadings] = useState([])
@@ -328,8 +335,8 @@ export default function TemperaturePage() {
   useEffect(() => {
     if (!isLiveMode || recipients.length === 0) return
 
-    // Check threshold breach - send only ONCE (dark red popup)
-    if (currentTemp < userThreshold && !alertSent) {
+    // Check threshold breach - send only ONCE - BIG RED MODAL
+    if (currentTemp < userThreshold && !thresholdAlertSent) {
       console.log(`🚨 THRESHOLD ALERT: Temp ${currentTemp}°C below threshold ${userThreshold}°C`)
       sendAlert(
         recipients,
@@ -338,10 +345,20 @@ export default function TemperaturePage() {
         `⚠️ ALERT: Temperature dropped below threshold! Current: ${currentTemp}°C, Threshold: ${userThreshold}°C`,
         'alert-danger'
       )
-      setAlertSent(true)
+      // Show BIG RED modal for threshold breach
+      setDangerModalData({
+        type: 'danger', // RED color
+        currentTemp: currentTemp,
+        target: userThreshold,
+        emailSentTo: recipients[0]?.email || 'configured recipient',
+        title: '🚨 THRESHOLD BREACH',
+        subtitle: `Temperature has dropped below ${userThreshold}°C threshold!`
+      })
+      setShowDangerModal(true)
+      setThresholdAlertSent(true)
     }
 
-    // Check target breach (40°C) - send only ONCE (BIG DANGER MODAL)
+    // Check target breach (40°C) - send only ONCE - BIG RED MODAL
     if (currentTemp < TARGET_TEMP && !targetAlertSent) {
       console.log(`🚨 TARGET ALERT: Temp ${currentTemp}°C below target ${TARGET_TEMP}°C`)
       sendAlert(
@@ -351,11 +368,14 @@ export default function TemperaturePage() {
         `🎯 ALERT: Temperature dropped below target! Current: ${currentTemp}°C, Target: ${TARGET_TEMP}°C`,
         'alert-danger'
       )
-      // Show BIG danger modal for target breach
+      // Show BIG RED modal for target breach
       setDangerModalData({
+        type: 'danger', // RED color
         currentTemp: currentTemp,
         target: TARGET_TEMP,
-        emailSentTo: recipients[0]?.email || 'configured recipient'
+        emailSentTo: recipients[0]?.email || 'configured recipient',
+        title: '🎯 TARGET TEMPERATURE REACHED',
+        subtitle: 'System has reached the critical 40°C target!'
       })
       setShowDangerModal(true)
       setTargetAlertSent(true)
@@ -404,7 +424,7 @@ export default function TemperaturePage() {
   useEffect(() => {
     if (recipients.length === 0) return
 
-    // Trigger alert at exactly 10 minutes (600 seconds) remaining (light orange popup)
+    // Trigger alert at exactly 10 minutes (600 seconds) remaining - BIG ORANGE MODAL
     if (predictedTime === 600 && !alert10MinSent) {
       console.log('🚨 AUTO ALERT: 10 minutes remaining to threshold!')
       sendAlert(
@@ -414,10 +434,21 @@ export default function TemperaturePage() {
         `⏰ ALERT: Temperature will reach ${userThreshold}°C in 10 minutes!`,
         'alert-warning'
       )
+      // Show BIG ORANGE modal for 10-minute warning
+      setDangerModalData({
+        type: 'warning', // ORANGE color
+        currentTemp: currentTemp,
+        target: userThreshold,
+        emailSentTo: recipients[0]?.email || 'configured recipient',
+        title: '⏰ 10 MINUTES REMAINING',
+        subtitle: 'Temperature approaching threshold - Take action now',
+        timeRemaining: 600
+      })
+      setShowDangerModal(true)
       setAlert10MinSent(true)
     }
 
-    // Trigger alert at exactly 5 minutes (300 seconds) remaining (BIG RED DANGER MODAL)
+    // Trigger alert at exactly 5 minutes (300 seconds) remaining - BIG RED DANGER MODAL
     if (predictedTime === 300 && !alertSent) {
       console.log('🚨 AUTO ALERT: 5 minutes remaining to threshold!')
       sendAlert(
@@ -427,14 +458,15 @@ export default function TemperaturePage() {
         `⏰ ALERT: Temperature will reach ${userThreshold}°C in 5 minutes!`,
         'alert-danger'
       )
-      // Show BIG danger modal for 5-minute warning
+      // Show BIG RED modal for 5-minute warning
       setDangerModalData({
+        type: 'danger', // RED color
         currentTemp: currentTemp,
         target: userThreshold,
         emailSentTo: recipients[0]?.email || 'configured recipient',
-        title: '5 MINUTES REMAINING!',
-        subtitle: 'Temperature will reach threshold soon',
-        isFiveMinute: true
+        title: '🚨 5 MINUTES REMAINING',
+        subtitle: 'CRITICAL: Temperature will reach threshold soon!',
+        timeRemaining: 300
       })
       setShowDangerModal(true)
       setAlertSent(true)
@@ -453,6 +485,9 @@ export default function TemperaturePage() {
       setAlertSent(false)
       setAlert10MinSent(false)
       setTargetAlertSent(false)
+      setThresholdAlertSent(false)
+      // Hide top countdown bar from previous session
+      setShowTopCountdownBar(false)
 
       const res = await fetch('/api/start-prediction', { method: 'POST' })
       console.log('[DEBUG] API response status:', res.status)
@@ -904,7 +939,7 @@ export default function TemperaturePage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav user={user} />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className={`flex-1 overflow-y-auto p-6 ${showTopCountdownBar ? 'pt-24' : ''}`}>
           <div className="max-w-[1600px] mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -2045,7 +2080,7 @@ export default function TemperaturePage() {
 
       {/* Alert Popup Modal */}
       {showAlertPopup && alertPopupData && (
-        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
+        <div className="fixed top-28 right-4 z-[999999] animate-in slide-in-from-right-5 fade-in duration-300">
           <div className={`w-[420px] rounded-2xl shadow-2xl overflow-hidden ${alertPopupData.type === 'alert-warning'
             ? 'bg-gradient-to-br from-orange-400 via-amber-500 to-orange-500 ring-8 ring-orange-400/60 shadow-[0_0_40px_rgba(251,146,60,0.6)]'
             : 'bg-gradient-to-br from-red-500 via-rose-600 to-red-600 ring-8 ring-red-500/60 shadow-[0_0_40px_rgba(239,68,68,0.6)]'
@@ -2113,61 +2148,135 @@ export default function TemperaturePage() {
         </div>
       )}
 
-      {/* BIG DANGER MODAL - Target Breach / 5-min Alert (Centered, Maximum Red) */}
+      {/* BIG ALERT MODAL - Dynamic Orange (warning) or Red (danger) */}
       {showDangerModal && dangerModalData && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-[600px] rounded-3xl shadow-2xl overflow-hidden bg-gradient-to-br from-red-600 via-red-700 to-rose-800 ring-[12px] ring-red-500/70 shadow-[0_0_80px_rgba(220,38,38,0.8)]">
+          <div className={`w-[520px] max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl 
+            ${dangerModalData.type === 'warning'
+              ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 ring-[10px] ring-orange-400/70 shadow-[0_0_60px_rgba(251,146,60,0.8)]'
+              : 'bg-gradient-to-br from-red-600 via-red-700 to-rose-800 ring-[10px] ring-red-500/70 shadow-[0_0_60px_rgba(220,38,38,0.8)]'
+            }`}>
             {/* Header */}
-            <div className="px-8 py-6 text-center border-b border-red-500/30">
-              <div className="text-6xl mb-4 animate-pulse">{dangerModalData.isFiveMinute ? '⏰' : '🚨'}</div>
-              <h1 className="text-white font-black text-3xl tracking-wide">{dangerModalData.title || 'TARGET TEMPERATURE REACHED!'}</h1>
-              <p className="text-red-200 text-lg mt-2">{dangerModalData.subtitle || 'System has reached the critical temperature threshold'}</p>
+            <div className={`px-6 py-4 text-center border-b ${dangerModalData.type === 'warning' ? 'border-orange-400/30' : 'border-red-500/30'}`}>
+              <div className="text-5xl mb-2 animate-pulse">{dangerModalData.title?.includes('10') ? '⏰' : dangerModalData.title?.includes('5') ? '⏰' : '🚨'}</div>
+              <h1 className="text-white font-black text-2xl tracking-wide">{dangerModalData.title || 'ALERT!'}</h1>
+              <p className={`text-base mt-1 ${dangerModalData.type === 'warning' ? 'text-orange-100' : 'text-red-200'}`}>{dangerModalData.subtitle || 'System alert triggered'}</p>
             </div>
 
             {/* Content */}
-            <div className="bg-red-900/50 p-8 space-y-6">
+            <div className={`p-6 space-y-4 ${dangerModalData.type === 'warning' ? 'bg-orange-800/50' : 'bg-red-900/50'}`}>
               {/* Big Temperature Display */}
-              <div className="text-center bg-red-950/60 rounded-2xl p-8 border-2 border-red-500/50">
-                <div className="text-red-300 text-xl font-semibold mb-2">CURRENT TEMPERATURE</div>
-                <div className="text-white text-7xl font-black" style={{ textShadow: '0 0 30px rgba(255,0,0,0.5)' }}>
+              <div className={`text-center rounded-2xl p-6 border-2 ${dangerModalData.type === 'warning' ? 'bg-orange-900/60 border-orange-400/50' : 'bg-red-950/60 border-red-500/50'}`}>
+                <div className={`text-lg font-semibold mb-1 ${dangerModalData.type === 'warning' ? 'text-orange-200' : 'text-red-300'}`}>CURRENT TEMPERATURE</div>
+                <div className="text-white text-6xl font-black" style={{ textShadow: dangerModalData.type === 'warning' ? '0 0 30px rgba(251,146,60,0.5)' : '0 0 30px rgba(255,0,0,0.5)' }}>
                   {dangerModalData.currentTemp?.toFixed(1)}°C
                 </div>
-                <div className="text-red-400 text-lg mt-4">
+                <div className={`text-base mt-2 ${dangerModalData.type === 'warning' ? 'text-orange-300' : 'text-red-400'}`}>
                   Target: <span className="font-bold text-white">{dangerModalData.target}°C</span>
                 </div>
               </div>
 
               {/* Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-red-950/60 rounded-xl p-4 border border-red-500/30">
-                  <div className="text-red-300 text-sm font-semibold">📧 Alert Sent To</div>
-                  <div className="text-white text-lg font-bold truncate">{dangerModalData.emailSentTo}</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`rounded-xl p-3 border ${dangerModalData.type === 'warning' ? 'bg-orange-900/60 border-orange-400/30' : 'bg-red-950/60 border-red-500/30'}`}>
+                  <div className={`text-xs font-semibold ${dangerModalData.type === 'warning' ? 'text-orange-200' : 'text-red-300'}`}>📧 Alert Sent To</div>
+                  <div className="text-white text-base font-bold truncate">{dangerModalData.emailSentTo}</div>
                 </div>
-                <div className="bg-red-950/60 rounded-xl p-4 border border-red-500/30">
-                  <div className="text-red-300 text-sm font-semibold">❄️ Status</div>
-                  <div className="text-white text-lg font-bold">Cooling Complete</div>
+                <div className={`rounded-xl p-3 border ${dangerModalData.type === 'warning' ? 'bg-orange-900/60 border-orange-400/30' : 'bg-red-950/60 border-red-500/30'}`}>
+                  <div className={`text-xs font-semibold ${dangerModalData.type === 'warning' ? 'text-orange-200' : 'text-red-300'}`}>⏱️ Time Remaining</div>
+                  <div className="text-white text-base font-bold">{dangerModalData.timeRemaining ? `${Math.floor(dangerModalData.timeRemaining / 60)}:${(dangerModalData.timeRemaining % 60).toString().padStart(2, '0')}` : 'N/A'}</div>
                 </div>
               </div>
 
               {/* Success Message */}
-              <div className="flex items-center justify-center gap-3 text-green-400 text-lg font-semibold bg-green-900/30 rounded-xl p-4 border border-green-500/30">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex items-center justify-center gap-2 text-green-400 text-base font-semibold bg-green-900/30 rounded-xl p-3 border border-green-500/30">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
                 Alert successfully delivered!
               </div>
 
-              {/* Close Button */}
+              {/* Acknowledge Button - Collapses to Top Bar */}
               <button
-                onClick={() => setShowDangerModal(false)}
-                className="w-full py-4 bg-white text-red-700 font-bold text-xl rounded-xl hover:bg-red-50 transition-all shadow-lg"
+                onClick={() => {
+                  setShowDangerModal(false)
+                  setShowTopCountdownBar(true)
+                  setTopBarAlertType(dangerModalData.type)
+                  setTopBarMessage(dangerModalData.title || 'Alert Active')
+                  setTopBarContact({
+                    name: recipients[0]?.name || 'Recipient',
+                    email: dangerModalData.emailSentTo || recipients[0]?.email || ''
+                  })
+                }}
+                className={`w-full py-3 font-bold text-lg rounded-xl transition-all shadow-lg ${dangerModalData.type === 'warning' ? 'bg-white text-orange-700 hover:bg-orange-50' : 'bg-white text-red-700 hover:bg-red-50'}`}
               >
-                ACKNOWLEDGE & CLOSE
+                ACKNOWLEDGE
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* GLOWING TOP COUNTDOWN BAR - Color changes: ORANGE (>5min) → RED (≤5min) */}
+      {showTopCountdownBar && (() => {
+        const isUrgent = predictedTime !== null && predictedTime <= 300;
+        return (
+          <div className={`fixed top-0 left-80 right-0 z-[99998] shadow-2xl animate-in slide-in-from-top duration-300
+            ${isUrgent
+              ? 'bg-gradient-to-r from-red-700 via-red-600 to-red-700'
+              : 'bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600'
+            }`}
+          >
+            <div className="flex items-center justify-between py-4 px-8">
+              {/* Left: Alert Message */}
+              <div className="flex items-center gap-4 min-w-[280px]">
+                <span className="text-white text-3xl animate-pulse">{isUrgent ? '🚨' : '⏰'}</span>
+                <div>
+                  <div className="text-white font-black text-xl">{topBarMessage}</div>
+                  <div className="text-white/80 text-sm">Temperature monitoring active</div>
+                </div>
+              </div>
+
+              {/* Center: Countdown + Current Temp */}
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <div className="text-white/70 text-xs uppercase tracking-wider mb-1">Time Remaining</div>
+                  <span className={`inline-block text-white text-4xl font-black px-8 py-3 rounded-xl animate-pulse
+                    ${isUrgent
+                      ? 'bg-red-900/60 shadow-[0_0_40px_rgba(239,68,68,0.9)] ring-2 ring-red-300/50'
+                      : 'bg-orange-800/60 shadow-[0_0_40px_rgba(251,146,60,0.9)] ring-2 ring-orange-300/50'
+                    }`}
+                  >
+                    {predictedTime !== null && predictedTime >= 0
+                      ? `${Math.floor(predictedTime / 60).toString().padStart(2, '0')}:${(predictedTime % 60).toString().padStart(2, '0')}`
+                      : '00:00'
+                    }
+                  </span>
+                </div>
+                <div className="text-center border-l border-white/30 pl-6">
+                  <div className="text-white/70 text-xs uppercase tracking-wider mb-1">Current Temp</div>
+                  <div className="text-white text-2xl font-bold">{currentTemp?.toFixed(1)}°C</div>
+                </div>
+              </div>
+
+              {/* Right: Contact Info + Close */}
+              <div className="flex items-center gap-6 min-w-[250px] justify-end">
+                <div className="text-right">
+                  <div className="text-white/70 text-xs uppercase tracking-wider">Alert sent to:</div>
+                  <div className="text-white text-base font-bold">{topBarContact.name}</div>
+                  <div className="text-white/80 text-sm">{topBarContact.email}</div>
+                </div>
+                <button
+                  onClick={() => setShowTopCountdownBar(false)}
+                  className="text-white/70 hover:text-white text-2xl font-bold transition-colors p-2 hover:bg-white/10 rounded-lg"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   )
 }
