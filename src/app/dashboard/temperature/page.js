@@ -273,7 +273,7 @@ export default function TemperaturePage() {
     }
 
     fetchLiveData() // Initial fetch
-    const interval = setInterval(fetchLiveData, 5000) // Poll every 5 seconds
+    const interval = setInterval(fetchLiveData, 1000) // Poll every 1 second for real-time updates
 
     return () => clearInterval(interval)
   }, [])
