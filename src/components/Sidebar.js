@@ -64,7 +64,7 @@ export default function Sidebar({ activeSection }) {
   }
 
   return (
-    <div className="w-80 min-h-screen bg-[#0B1E4A] flex flex-col justify-between py-8 px-6 shadow-2xl">
+    <div className="hidden md:flex w-80 min-h-screen bg-[#0B1E4A] flex-col justify-between py-8 px-6 shadow-2xl">
       {/* Top Section */}
       <div>
         {/* Logo Section */}

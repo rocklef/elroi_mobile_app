@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import ShaderBackground from '@/components/ui/shader-background'
@@ -20,6 +20,11 @@ export default function LoginPage() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const router = useRouter()
 
+  // Prefetch dashboard route while user types credentials
+  useEffect(() => {
+    router.prefetch('/dashboard')
+  }, [router])
+
   const handleAuth = async (e) => {
     e.preventDefault()
     setError('')
@@ -29,7 +34,7 @@ export default function LoginPage() {
       if (isLogin) {
         // Check if loginIdentifier is email or phone
         const isEmail = loginIdentifier.includes('@')
-        
+
         if (isEmail) {
           // Login with email
           const { data, error } = await supabase.auth.signInWithPassword({
@@ -39,21 +44,21 @@ export default function LoginPage() {
           if (error) throw error
         } else {
           // Login with phone number
-          const formattedPhone = loginIdentifier.startsWith('+91') 
-            ? loginIdentifier 
+          const formattedPhone = loginIdentifier.startsWith('+91')
+            ? loginIdentifier
             : `+91${loginIdentifier}`
-          
+
           const { data, error } = await supabase.auth.signInWithPassword({
             phone: formattedPhone,
             password,
           })
           if (error) throw error
         }
-        
+
         // Start fade-out transition
         setIsTransitioning(true)
-        await new Promise(resolve => setTimeout(resolve, 700))
-        router.push('/dashboard')
+        // Removed artificial delay
+        router.replace('/dashboard')
       } else {
         // Sign up - register with email and store phone as metadata (no verification)
         const { data, error } = await supabase.auth.signUp({
@@ -68,14 +73,18 @@ export default function LoginPage() {
           }
         })
         if (error) throw error
-        
+
         // Redirect to dashboard (no OTP verification needed)
         setIsTransitioning(true)
-        await new Promise(resolve => setTimeout(resolve, 700))
-        router.push('/dashboard')
+        // Removed artificial delay
+        router.replace('/dashboard')
       }
     } catch (error) {
-      setError(error.message)
+      if (error.message === 'Failed to fetch') {
+        setError('Unable to connect to server. Please check your internet connection and try again.')
+      } else {
+        setError(error.message)
+      }
       setIsTransitioning(false)
     } finally {
       setLoading(false)
@@ -98,32 +107,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className={`w-full h-screen relative overflow-hidden transition-opacity duration-700 ease-in-out ${
-      isTransitioning ? 'opacity-0' : 'opacity-100'
-    }`}>
+    <div className={`w-full h-screen relative overflow-hidden transition-opacity duration-700 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'
+      }`}>
       {/* Animated Shader Background */}
       <ShaderBackground />
-      
+
       {/* Centered Login Container */}
       <div className="flex items-center justify-center min-h-screen p-4 relative z-10">
         {/* Ultra Compact Login Card */}
         <div className="w-full max-w-[380px]">
-          <div className="bg-white/98 backdrop-blur-xl rounded-2xl overflow-hidden" 
-               style={{ 
-                 boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 0 30px rgba(0, 113, 206, 0.12)',
-                 border: '1px solid rgba(255,255,255,0.9)',
-                 maxHeight: '90vh',
-                 overflowY: 'auto'
-               }}>
-            
+          <div className="bg-white/98 backdrop-blur-xl rounded-2xl overflow-hidden"
+            style={{
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 0 30px rgba(0, 113, 206, 0.12)',
+              border: '1px solid rgba(255,255,255,0.9)',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}>
+
             {/* Mini Header */}
-            <div className="bg-gradient-to-r from-[#0071CE]/8 via-[#00B4D8]/8 to-[#0071CE]/8 px-6 text-center border-b border-gray-100" 
-                 style={{ paddingTop: isLogin ? '20px' : '12px', paddingBottom: isLogin ? '20px' : '12px' }}>
+            <div className="bg-gradient-to-r from-[#0071CE]/8 via-[#00B4D8]/8 to-[#0071CE]/8 px-6 text-center border-b border-gray-100"
+              style={{ paddingTop: isLogin ? '20px' : '12px', paddingBottom: isLogin ? '20px' : '12px' }}>
               <div className="inline-flex items-center justify-center" style={{ marginBottom: isLogin ? '8px' : '6px' }}>
-                <Image 
-                  src="/logo.png" 
-                  alt="ELROI Logo" 
-                  width={isLogin ? 80 : 60} 
+                <Image
+                  src="/logo.png"
+                  alt="ELROI Logo"
+                  width={isLogin ? 80 : 60}
                   height={isLogin ? 80 : 60}
                   className="object-contain transition-all duration-300"
                 />
@@ -133,41 +141,39 @@ export default function LoginPage() {
                   <h1 className="text-xl font-bold text-[#060F30] mb-1">
                     Welcome Back
                   </h1>
-                  <p className="text-[10px] text-[#060F30] font-semibold">Sign in to your dashboard</p>
+                  <p className="text-xs text-[#060F30] font-semibold">Sign in to your dashboard</p>
                 </>
               )}
             </div>
 
             {/* Compact Form Content */}
             <div className="px-6 py-4">
-              
+
               {/* Mini Tab Toggle */}
               <div className="flex gap-1.5 mb-4">
                 <button
                   onClick={() => setIsLogin(true)}
-                  className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 cursor-pointer ${
-                    isLogin 
-                      ? 'bg-[#071135] text-white shadow-md shadow-[#071135]/25 scale-[0.98]' 
+                  className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 cursor-pointer ${isLogin
+                      ? 'bg-[#071135] text-white shadow-md shadow-[#071135]/25 scale-[0.98]'
                       : 'bg-gray-100 text-[#060F30] hover:bg-gray-200 active:scale-95'
-                  }`}
+                    }`}
                 >
                   Log In
                 </button>
                 <button
                   onClick={() => setIsLogin(false)}
-                  className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 cursor-pointer ${
-                    !isLogin 
-                      ? 'bg-[#071135] text-white shadow-md shadow-[#071135]/25 scale-[0.98]' 
+                  className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 cursor-pointer ${!isLogin
+                      ? 'bg-[#071135] text-white shadow-md shadow-[#071135]/25 scale-[0.98]'
                       : 'bg-gray-100 text-[#060F30] hover:bg-gray-200 active:scale-95'
-                  }`}
+                    }`}
                 >
                   Sign Up
                 </button>
               </div>
 
               {/* Mini Form */}
-              <form onSubmit={handleAuth} className={isLogin ? "space-y-4" : "space-y-3"}>
-                
+              <form onSubmit={handleAuth} className={isLogin ? "space-y-4" : "space-y-3.5"}>
+
                 {/* Name - Only for Sign Up */}
                 {!isLogin && (
                   <div className="animate-in slide-in-from-top-2 fade-in duration-300">
@@ -253,7 +259,7 @@ export default function LoginPage() {
                         pattern="[0-9]{10}"
                       />
                     </div>
-                    <p className="text-[10px] text-[#5B6C84] mt-1">10-digit Indian mobile number (for contact purposes only)</p>
+                    <p className="text-xs text-[#5B6C84] mt-1">10-digit Indian mobile number (for contact purposes only)</p>
                   </div>
                 )}
 
@@ -317,10 +323,10 @@ export default function LoginPage() {
                 {/* Error */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-2 flex items-start space-x-2">
-                    <svg className="h-3.5 w-3.5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-[10px] text-red-700 font-medium">{error}</p>
+                    <p className="text-xs text-red-700 font-medium">{error}</p>
                   </div>
                 )}
 
@@ -351,7 +357,7 @@ export default function LoginPage() {
                   <div className="w-full border-t border-gray-200"></div>
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-2 bg-white text-[#9CA3AF] font-medium text-[10px] uppercase tracking-wider">Or</span>
+                  <span className="px-2 bg-white text-[#9CA3AF] font-medium text-xs uppercase tracking-wider">Or</span>
                 </div>
               </div>
 
@@ -362,10 +368,10 @@ export default function LoginPage() {
                 className="w-full bg-white hover:bg-gray-50 border border-gray-200 hover:border-[#0071CE] text-[#060F30] font-semibold py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 text-xs shadow-sm hover:shadow-md cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
                 <span>Continue with Google</span>
               </button>

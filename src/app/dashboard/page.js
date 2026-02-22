@@ -9,11 +9,6 @@ import TopNav from '@/components/TopNav'
 export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const router = useRouter()
-  const [cardAnimationClasses, setCardAnimationClasses] = useState([
-    'opacity-0 translate-y-4', 'opacity-0 translate-y-4', 'opacity-0 translate-y-4',
-    'opacity-0 translate-y-4', 'opacity-0 translate-y-4'
-  ])
-  const [pageLoaded, setPageLoaded] = useState(false)
   const [thresholdTemp, setThresholdTemp] = useState(40.0)
   const [liveData, setLiveData] = useState({
     temperature: null,
@@ -29,45 +24,29 @@ export default function DashboardPage() {
         router.push('/login')
       } else {
         setUser(session.user)
-        // Trigger page load animation
-        setTimeout(() => setPageLoaded(true), 100)
       }
     }
 
     checkUser()
 
-    // Load latest data from reports
     const loadLatestData = () => {
       try {
         const savedReports = localStorage.getItem('predictive_reports')
         if (savedReports) {
           const reports = JSON.parse(savedReports)
-
-          // Get latest temperature data
           if (reports.Temperature && reports.Temperature.length > 0) {
             const latestTemp = reports.Temperature[reports.Temperature.length - 1]
             if (latestTemp.values && latestTemp.values.length > 0) {
               const currentTemp = latestTemp.values[latestTemp.values.length - 1]
               const avgTemp = (latestTemp.values.reduce((a, b) => a + b, 0) / latestTemp.values.length).toFixed(1)
-              setLiveData(prev => ({
-                ...prev,
-                temperature: { current: currentTemp.toFixed(1), average: avgTemp }
-              }))
-              console.log('✅ Dashboard loaded Temperature:', currentTemp.toFixed(1), '°C')
+              setLiveData(prev => ({ ...prev, temperature: { current: currentTemp.toFixed(1), average: avgTemp } }))
             }
           }
-
-          // Load other parameters if available
-          // Pressure, Humidity, Vibration can be added when data is uploaded
         }
-
-        // Load threshold from alertConfig
         const alertConfig = localStorage.getItem('alertConfig')
         if (alertConfig) {
           const config = JSON.parse(alertConfig)
-          if (config.thresholdTemp) {
-            setThresholdTemp(config.thresholdTemp)
-          }
+          if (config.thresholdTemp) setThresholdTemp(config.thresholdTemp)
         }
       } catch (error) {
         console.error('Error loading dashboard data:', error)
@@ -75,55 +54,54 @@ export default function DashboardPage() {
     }
 
     loadLatestData()
-    // Refresh data every 5 seconds
     const dataInterval = setInterval(loadLatestData, 5000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.push('/login')
-      } else {
-        setUser(session.user)
-      }
-    })
-
-    // Staggered card animations
-    const timers = [100, 200, 300, 400, 500].map((delay, index) => {
-      return setTimeout(() => {
-        setCardAnimationClasses(prev => {
-          const newClasses = [...prev]
-          newClasses[index] = 'opacity-100 translate-y-0'
-          return newClasses
-        })
-      }, delay)
+      if (!session) router.push('/login')
+      else setUser(session.user)
     })
 
     return () => {
       subscription.unsubscribe()
-      timers.forEach(timer => clearTimeout(timer))
       clearInterval(dataInterval)
     }
   }, [router])
 
   if (!user) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#F7F9FC]">Loading...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F6FA]">
+        <div className="w-8 h-8 border-4 border-[#0B1E4A] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
-  // 5 Parameters - Updated with intense colors and relevant icons
+  const getFirstName = (email) => {
+    if (!email) return 'User'
+    const name = email.split('@')[0]
+    const parts = name.split(/[._-]/)
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
+
   const parameters = [
     {
       id: 'temperature',
       title: 'Temperature',
       value: liveData.temperature ? liveData.temperature.current : thresholdTemp.toFixed(1),
       unit: '°C',
-      subtext: liveData.temperature ? `Avg: ${liveData.temperature.average}°C` : 'Threshold Value',
-      bgGradient: 'from-blue-200 via-blue-100 to-cyan-100',
-      iconBg: 'from-blue-600 via-blue-700 to-cyan-700',
-      shadowColor: 'shadow-blue-300/60',
-      iconColor: 'text-white',
+      subtext: liveData.temperature ? `Avg ${liveData.temperature.average}°C` : 'Threshold value',
+      accentColor: '#3B82F6',
+      bgLight: '#EFF6FF',
+      status: 'normal',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C10.8954 2 10 2.89543 10 4V13.1707C8.83481 13.5825 8 14.6938 8 16C8 17.6569 9.34315 19 11 19C11.3506 19 11.6872 18.9398 12 18.8293C12.3128 18.9398 12.6494 19 13 19C14.6569 19 16 17.6569 16 16C16 14.6938 15.1652 13.5825 14 13.1707V4C14 2.89543 13.1046 2 12 2ZM12 4V13C12 13.5523 12.4477 14 13 14C14.1046 14 15 14.8954 15 16C15 17.1046 14.1046 18 13 18C12.4477 18 12 17.5523 12 17V4ZM11 4V13C11 13.5523 10.5523 14 10 14C8.89543 14 8 14.8954 8 16C8 17.1046 8.89543 18 10 18C10.5523 18 11 17.5523 11 17V4Z" />
-          <rect x="10" y="14" width="4" height="4" rx="2" fill="white" />
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z" />
         </svg>
       )
     },
@@ -131,16 +109,15 @@ export default function DashboardPage() {
       id: 'pressure',
       title: 'Pressure',
       value: '2.1',
-      unit: ' bar',
-      subtext: 'Δ −0.2 predicted',
-      bgGradient: 'from-orange-200 via-orange-100 to-red-100',
-      iconBg: 'from-orange-600 via-orange-700 to-red-600',
-      shadowColor: 'shadow-orange-300/60',
-      iconColor: 'text-white',
+      unit: 'bar',
+      subtext: '−0.2 predicted',
+      accentColor: '#F97316',
+      bgLight: '#FFF7ED',
+      status: 'normal',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <circle cx="12" cy="12" r="9" strokeWidth="2.5" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4" />
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 00-7.07 17.07M12 2a10 10 0 017.07 17.07M12 2v2m0 10l3.5-5" />
+          <circle cx="12" cy="14" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       )
     },
@@ -150,13 +127,12 @@ export default function DashboardPage() {
       value: '58',
       unit: '%',
       subtext: 'Trending upward',
-      bgGradient: 'from-emerald-200 via-teal-100 to-cyan-100',
-      iconBg: 'from-emerald-600 via-teal-700 to-cyan-700',
-      shadowColor: 'shadow-teal-300/60',
-      iconColor: 'text-white',
+      accentColor: '#10B981',
+      bgLight: '#ECFDF5',
+      status: 'normal',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3c0 0-7 7-7 11a7 7 0 0014 0c0-4-7-11-7-11z" />
         </svg>
       )
     },
@@ -164,151 +140,123 @@ export default function DashboardPage() {
       id: 'vibration',
       title: 'Vibration',
       value: '2.3',
-      unit: ' mm/s',
+      unit: 'mm/s',
       subtext: 'RMS velocity',
-      bgGradient: 'from-purple-200 via-purple-100 to-fuchsia-100',
-      iconBg: 'from-purple-600 via-purple-700 to-fuchsia-700',
-      shadowColor: 'shadow-purple-300/60',
-      iconColor: 'text-white',
+      accentColor: '#8B5CF6',
+      bgLight: '#F5F3FF',
+      status: 'normal',
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    },
-    {
-      id: 'add',
-      title: 'Add Parameter',
-      value: null,
-      unit: '',
-      subtext: 'Configure new sensor',
-      bgGradient: 'from-slate-200 via-gray-100 to-zinc-100',
-      iconBg: 'from-slate-500 via-gray-600 to-zinc-600',
-      shadowColor: 'shadow-gray-300/60',
-      iconColor: 'text-white',
-      isDashed: true,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" />
         </svg>
       )
     }
   ]
 
-  const handleCardClick = (param) => {
-    if (param.isDashed) {
-      console.log('Open modal to add parameter')
-    } else {
-      // Navigate to parameter detail page
-      router.push(`/dashboard/${param.id}`)
-    }
+  const statusMap = {
+    normal: { dot: 'bg-green-400', label: 'Normal', text: 'text-green-600' },
+    warning: { dot: 'bg-amber-400', label: 'Warning', text: 'text-amber-600' },
+    critical: { dot: 'bg-red-500', label: 'Critical', text: 'text-red-600' },
   }
 
   return (
-    <div className={`flex min-h-screen transition-opacity duration-700 ease-in-out ${pageLoaded ? 'opacity-100' : 'opacity-0'
-      }`} style={{ background: 'linear-gradient(135deg, #C5EAF3 0%, #DDF4F8 50%, #F7FCFE 100%)' }}>
-      <div className={`transition-all duration-700 ease-in-out ${pageLoaded ? 'translate-x-0 opacity-100' : '-translate-x-8 opacity-0'
-        }`}>
-        <Sidebar activeSection="dashboard" />
-      </div>
+    <div className="flex min-h-screen bg-[#F2F2F7]">
+      <Sidebar activeSection="dashboard" />
 
       <div className="flex-1 flex flex-col">
-        {/* Top Navigation Bar */}
-        <div className={`transition-all duration-700 ease-in-out delay-100 ${pageLoaded ? 'translate-y-0 opacity-100' : '-translate-y-8 opacity-0'
-          }`}>
-          <TopNav title="Dashboard" />
-        </div>
+        <TopNav title="Dashboard" />
 
-        {/* Main Content - ONLY 5 Cards */}
-        <main className="flex-1 p-8">
-          <div className="max-w-7xl mx-auto">
-            {/* System Overview Section - 5 Colorful Parameter Cards */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-gray-900">System Overview</h2>
-                  <p className="text-sm text-gray-500 mt-1">Monitor and manage critical system metrics in real-time</p>
-                </div>
-                <button className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm hover:shadow-md">
-                  <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="text-sm font-semibold text-gray-700">Refresh Data</span>
-                </button>
+        <main className="flex-1 p-4 md:p-8 pb-28 md:pb-8 overflow-y-auto">
+          <div className="max-w-2xl mx-auto md:max-w-none">
+
+            {/* Greeting */}
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-gray-900">{getGreeting()}, {getFirstName(user.email)}</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Real-time system monitoring</p>
+            </div>
+
+            {/* System Status Banner */}
+            <div className="bg-[#0B1E4A] rounded-2xl p-4 mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-white/50 text-xs font-semibold uppercase tracking-wider">System Status</p>
+                <p className="text-white font-bold text-base mt-1">All Systems Operational</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
+                </span>
+                <span className="text-green-400 text-xs font-semibold">Live</span>
               </div>
             </div>
 
-            {/* 4 Parameter Cards with Modern Colorful Design */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {/* First 4 cards - Intense colorful design with relevant icons */}
-              {parameters.slice(0, 4).map((param, index) => (
-                <div
-                  key={param.id}
-                  onClick={() => handleCardClick(param)}
-                  className={`bg-gradient-to-br ${param.bgGradient} rounded-2xl p-6 cursor-pointer transform transition-all duration-300 ease-out hover:scale-105 hover:shadow-2xl ${cardAnimationClasses[index]} ${param.shadowColor} relative overflow-hidden group border border-white/50`}
-                  style={{
-                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                    minHeight: '200px',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  {/* Multiple decorative background elements for depth */}
-                  <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/40 rounded-full blur-2xl" />
-                  <div className="absolute -left-4 -bottom-4 w-28 h-28 bg-white/30 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
-                  <div className="absolute right-1/3 bottom-1/4 w-20 h-20 bg-gradient-to-br from-white/15 to-transparent rounded-full blur-lg" />
+            {/* Section heading */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Parameters</h3>
+              <button
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold active:scale-95 transition-transform"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
 
-                  <div className="relative z-10">
-                    {/* Icon */}
-                    <div className="flex items-center justify-between mb-5">
-                      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${param.iconBg} flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 ring-2 ring-white/60`}
-                        style={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25), inset 0 -2px 10px rgba(0, 0, 0, 0.25)' }}>
+            {/* 2x2 Parameter Cards Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {parameters.map((param) => {
+                const s = statusMap[param.status]
+                return (
+                  <div
+                    key={param.id}
+                    onClick={() => router.push(`/dashboard/${param.id}`)}
+                    className="bg-white rounded-2xl p-4 cursor-pointer active:scale-95 transition-all duration-150 shadow-sm border border-gray-100/80"
+                  >
+                    {/* Icon + Status row */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: param.bgLight, color: param.accentColor }}
+                      >
                         {param.icon}
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                        <span className={`text-[10px] font-bold ${s.text}`}>{s.label}</span>
                       </div>
                     </div>
 
-                    {/* Value with enhanced text shadow */}
-                    <div className="mb-3">
-                      <p className="text-4xl font-bold text-gray-900" style={{ textShadow: '0 2px 6px rgba(0, 0, 0, 0.08)' }}>
-                        {param.value}<span className="text-xl ml-1 text-gray-800">{param.unit}</span>
-                      </p>
+                    {/* Value */}
+                    <div className="mb-1">
+                      <span className="text-[26px] font-bold text-gray-900 leading-none">{param.value}</span>
+                      <span className="text-sm font-medium text-gray-400 ml-1">{param.unit}</span>
                     </div>
 
-                    {/* Title and subtext */}
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900 mb-1">{param.title}</h3>
-                      <p className="text-xs text-gray-700 font-semibold bg-white/50 px-2.5 py-1.5 rounded-lg inline-block shadow-sm">{param.subtext}</p>
-                    </div>
+                    {/* Title + subtext */}
+                    <p className="text-xs font-bold text-gray-700">{param.title}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{param.subtext}</p>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
-            {/* Centered Add Parameter Card with intense design and icon */}
-            <div className="flex justify-center">
-              <div className="w-full md:w-1/2 lg:w-1/4">
-                <div
-                  onClick={() => handleCardClick(parameters[4])}
-                  className={`bg-gradient-to-br ${parameters[4].bgGradient} rounded-2xl p-6 border-2 border-dashed border-gray-500 cursor-pointer transform transition-all duration-300 ease-out hover:scale-105 hover:border-gray-600 hover:shadow-2xl ${cardAnimationClasses[4]} ${parameters[4].shadowColor} group relative overflow-hidden`}
-                  style={{
-                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
-                    minHeight: '200px',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  {/* Decorative background */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-60" />
-
-                  <div className="flex flex-col items-center justify-center h-full min-h-[150px] relative z-10">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${parameters[4].iconBg} flex items-center justify-center mb-5 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 shadow-2xl ring-2 ring-white/60`}
-                      style={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2), inset 0 -2px 10px rgba(0, 0, 0, 0.15)' }}>
-                      {parameters[4].icon}
-                    </div>
-                    <h3 className="text-gray-900 text-lg font-bold mb-2" style={{ textShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>{parameters[4].title}</h3>
-                    <p className="text-gray-800 text-sm text-center font-semibold bg-white/50 px-3 py-1.5 rounded-lg shadow-sm">{parameters[4].subtext}</p>
-                  </div>
-                </div>
+            {/* Add Parameter Card */}
+            <div
+              className="bg-white rounded-2xl p-4 cursor-pointer active:scale-95 transition-all duration-150 border-2 border-dashed border-gray-200 flex items-center gap-3"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-600">Add Parameter</p>
+                <p className="text-xs text-gray-400">Configure a new sensor</p>
               </div>
             </div>
+
           </div>
         </main>
       </div>

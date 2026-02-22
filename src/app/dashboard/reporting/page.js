@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
+import TopNav from '@/components/TopNav'
+import PullToRefresh from '@/components/PullToRefresh'
 
 export default function ReportingPage() {
   const [user, setUser] = useState(null)
@@ -46,7 +48,7 @@ export default function ReportingPage() {
           const uniqueFiles = new Map()
           parsed[param].forEach(report => {
             // Use file content fingerprint (first 3 values + length) as unique key
-            const key = report.values && report.values.length > 0 
+            const key = report.values && report.values.length > 0
               ? `${report.fileName}_${report.values.slice(0, 3).join('_')}_${report.dataPoints}`
               : `${report.fileName}_${report.dataPoints}`
             if (!uniqueFiles.has(key)) {
@@ -68,7 +70,7 @@ export default function ReportingPage() {
   // Handle file upload
   const handleUploadReport = async () => {
     console.log('handleUploadReport called', { reportName, uploadFile })
-    
+
     if (!reportName.trim()) {
       alert('Please enter a report name')
       return
@@ -80,7 +82,7 @@ export default function ReportingPage() {
 
     const fileName = uploadFile.name.toLowerCase()
     console.log('Processing file:', fileName)
-    
+
     // Parse Excel file
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       try {
@@ -90,16 +92,16 @@ export default function ReportingPage() {
         const sheetName = wb.SheetNames[0]
         const ws = wb.Sheets[sheetName]
         const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
-        
+
         // Extract data
         const times = []
         const values = []
-        
+
         json.forEach(row => {
           const keys = Object.keys(row)
           const timeKey = keys.find(k => k.toLowerCase().includes('date') || k.toLowerCase().includes('time'))
           const valueKey = keys.find(k => k.toLowerCase().includes('temp') || k.toLowerCase().includes('value') || k.toLowerCase().includes('current'))
-          
+
           if (timeKey && valueKey) {
             let timestamp = row[timeKey]
             if (typeof timestamp === 'number') {
@@ -113,7 +115,7 @@ export default function ReportingPage() {
             values.push(parseFloat(row[valueKey]))
           }
         })
-        
+
         const newReport = {
           id: Date.now(),
           name: reportName,
@@ -130,10 +132,10 @@ export default function ReportingPage() {
           ...reports,
           [selectedParameter]: [...reports[selectedParameter], newReport]
         }
-        
+
         setReports(updatedReports)
         localStorage.setItem('predictive_reports', JSON.stringify(updatedReports))
-        
+
         setShowUploadModal(false)
         setReportName('')
         setUploadFile(null)
@@ -147,10 +149,10 @@ export default function ReportingPage() {
         const text = e.target.result
         const lines = text.split('\n').filter(l => l.trim())
         const headers = lines[0].split(',').map(h => h.trim())
-        
+
         const times = []
         const values = []
-        
+
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.trim())
           if (cols.length >= 2) {
@@ -158,7 +160,7 @@ export default function ReportingPage() {
             values.push(parseFloat(cols[1]))
           }
         }
-        
+
         const newReport = {
           id: Date.now(),
           name: reportName,
@@ -175,10 +177,10 @@ export default function ReportingPage() {
           ...reports,
           [selectedParameter]: [...reports[selectedParameter], newReport]
         }
-        
+
         setReports(updatedReports)
         localStorage.setItem('predictive_reports', JSON.stringify(updatedReports))
-        
+
         setShowUploadModal(false)
         setReportName('')
         setUploadFile(null)
@@ -198,131 +200,139 @@ export default function ReportingPage() {
   }
 
   if (!user) {
-    return <div className="min-h-screen flex items-center justify-center bg-white">Loading...</div>
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9FC] gap-3">
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-gray-500">Loading reports...</p>
+      </div>
+    )
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
+    <div className="flex min-h-screen bg-[#F2F2F7]">
       <Sidebar activeSection="reporting" />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopNav title="Reports" />
+
         {/* Main Content */}
-        <main className="flex-1 p-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-[#1A1F36]">Parameter Reports</h1>
-            <p className="text-gray-600 text-sm">Upload and manage multiple reports for each parameter</p>
-          </div>
+        <PullToRefresh>
+          <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
+            <div className="mb-4 md:mb-6">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Parameter Reports</h1>
+              <p className="text-gray-600 text-xs md:text-sm">Upload and manage reports for each parameter</p>
+            </div>
 
-          {/* Parameter Tabs */}
-          <div className="flex space-x-2 mb-6 border-b border-gray-200">
-            {parameters.map(param => (
-              <button
-                key={param}
-                onClick={() => setSelectedParameter(param)}
-                className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
-                  selectedParameter === param
-                    ? 'border-[#0071CE] text-[#0071CE] bg-blue-50'
-                    : 'border-transparent text-gray-600 hover:text-[#0071CE] hover:bg-gray-50'
-                }`}
-              >
-                {param}
-                {reports[param].length > 0 && (
-                  <span className="ml-2 bg-[#00D9C0] text-white text-xs px-2 py-1 rounded-full">
-                    {reports[param].length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Upload Button */}
-          <div className="mb-6">
-            <button
-              onClick={() => {
-                console.log('Upload button clicked!')
-                setShowUploadModal(true)
-              }}
-              className="cursor-pointer bg-[#0071CE] hover:bg-[#005BA3] text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-200 flex items-center space-x-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Upload New {selectedParameter} Report</span>
-            </button>
-          </div>
-
-          {/* Reports Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {reports[selectedParameter].length === 0 ? (
-              <div className="col-span-full text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-gray-600 font-semibold text-lg mb-2">No Reports Yet</p>
-                <p className="text-gray-500 text-sm">Upload a file in {selectedParameter} page to auto-generate report</p>
-              </div>
-            ) : (
-              reports[selectedParameter].map(report => (
-                <div 
-                  key={report.id} 
-                  className="bg-white rounded-xl border-2 border-gray-200 shadow-md hover:shadow-xl hover:border-[#0071CE] transition-all duration-200 p-6 relative group"
+            {/* Parameter Tabs - Pill style */}
+            <div className="flex gap-2 mb-6 bg-white rounded-xl p-1.5 shadow-sm border border-gray-200 w-fit overflow-x-auto">
+              {parameters.map(param => (
+                <button
+                  key={param}
+                  onClick={() => setSelectedParameter(param)}
+                  className={`px-5 py-2.5 font-semibold text-sm rounded-lg transition-all whitespace-nowrap ${selectedParameter === param
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-gray-100'
+                    }`}
                 >
-                  {/* Delete Button - Top Right */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (confirm(`Delete "${report.name}"?`)) {
-                        deleteReport(selectedParameter, report.id)
-                      }
-                    }}
-                    className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  {param}
+                  {reports[param].length > 0 && (
+                    <span className="ml-2 bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full">
+                      {reports[param].length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
 
-                  {/* Clickable Card Content */}
-                  <div 
-                    onClick={() => setExpandedCard(report)}
-                    className="cursor-pointer"
+            {/* Upload Button */}
+            <div className="mb-6">
+              <button
+                onClick={() => {
+                  console.log('Upload button clicked!')
+                  setShowUploadModal(true)
+                }}
+                className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-200 flex items-center space-x-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Upload New {selectedParameter} Report</span>
+              </button>
+            </div>
+
+            {/* Reports Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reports[selectedParameter].length === 0 ? (
+                <div className="col-span-full text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-gray-600 font-semibold text-lg mb-2">No Reports Yet</p>
+                  <p className="text-gray-500 text-sm">Upload a file in {selectedParameter} page to auto-generate report</p>
+                </div>
+              ) : (
+                reports[selectedParameter].map(report => (
+                  <div
+                    key={report.id}
+                    className="bg-white rounded-xl border-2 border-gray-200 shadow-md hover:shadow-xl hover:border-blue-500 hover:-translate-y-0.5 transition-all duration-200 p-6 relative group"
                   >
-                    {/* Small Card View */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1 pr-8">
-                        <h3 className="font-bold text-lg text-[#0B0B0B] mb-1">{report.name}</h3>
-                        <p className="text-sm text-gray-500 truncate">{report.fileName}</p>
+                    {/* Delete Button - Top Right */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (confirm(`Delete "${report.name}"?`)) {
+                          deleteReport(selectedParameter, report.id)
+                        }
+                      }}
+                      className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+
+                    {/* Clickable Card Content */}
+                    <div
+                      onClick={() => setExpandedCard(report)}
+                      className="cursor-pointer"
+                    >
+                      {/* Small Card View */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1 pr-8">
+                          <h3 className="font-bold text-lg text-gray-900 mb-1">{report.name}</h3>
+                          <p className="text-sm text-gray-500 truncate">{report.fileName}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {new Date(report.uploadDate).toLocaleDateString()}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          {report.values.length} data points
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-blue-600 font-semibold flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Click to view full details
+                        </p>
                       </div>
                     </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {new Date(report.uploadDate).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      {report.values.length} data points
-                    </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-[#0071CE] font-semibold flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      Click to view full details
-                    </p>
-                  </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </main>
+                ))
+              )}
+            </div>
+          </main>
+        </PullToRefresh>
       </div>
 
       {/* Upload Modal */}
@@ -334,22 +344,22 @@ export default function ReportingPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-[#0B0B0B] mb-2">Report Name</label>
+                <label className="block text-sm font-bold text-gray-900 mb-2">Report Name</label>
                 <input
                   type="text"
                   value={reportName}
                   onChange={(e) => setReportName(e.target.value)}
                   placeholder="e.g., Daily Temperature Log - Nov 13"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-[#0071CE] focus:outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-[#0B0B0B] mb-2">Excel File</label>
+                <label className="block text-sm font-bold text-gray-900 mb-2">Excel File</label>
                 <input
                   type="file"
                   accept=".csv,.xlsx,.xls"
                   onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-[#0071CE] focus:outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -362,7 +372,7 @@ export default function ReportingPage() {
               </button>
               <button
                 onClick={handleUploadReport}
-                className="px-6 py-2 bg-[#0071CE] hover:bg-[#005BA3] text-white font-semibold rounded-lg transition-colors duration-200"
+                className="px-6 py-2 bg-[#0071CE] hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
               >
                 Upload
               </button>
@@ -393,13 +403,13 @@ export default function ReportingPage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6">
               {/* Key Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 border-2 border-[#0071CE]">
                   <p className="text-sm text-gray-600 mb-1">Total Data Points</p>
-                  <p className="text-3xl font-bold text-[#0071CE]">{viewingReport.values.length}</p>
+                  <p className="text-3xl font-bold text-blue-600">{viewingReport.values.length}</p>
                 </div>
                 <div className="bg-gradient-to-br from-teal-50 to-white rounded-lg p-4 border-2 border-[#00D9C0]">
                   <p className="text-sm text-gray-600 mb-1">Minimum Value</p>
@@ -411,14 +421,14 @@ export default function ReportingPage() {
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-white rounded-lg p-4 border-2 border-[#7B68EE]">
                   <p className="text-sm text-gray-600 mb-1">Average Value</p>
-                  <p className="text-3xl font-bold text-[#7B68EE]">{(viewingReport.values.reduce((a,b) => a+b, 0) / viewingReport.values.length).toFixed(2)}°</p>
+                  <p className="text-3xl font-bold text-[#7B68EE]">{(viewingReport.values.reduce((a, b) => a + b, 0) / viewingReport.values.length).toFixed(2)}°</p>
                 </div>
               </div>
 
               {/* Status Breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="bg-white rounded-lg p-6 border-2 border-gray-200">
-                  <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">📊 Status Breakdown</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Status Breakdown</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2">
@@ -435,24 +445,24 @@ export default function ReportingPage() {
                       <span className="text-2xl font-bold text-[#E94E4E]">{viewingReport.values.filter(v => v < viewingReport.threshold).length}</span>
                     </div>
                     <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">Threshold: <span className="font-bold text-[#0B0B0B]">{viewingReport.threshold}°C</span></p>
+                      <p className="text-sm text-gray-600">Threshold: <span className="font-bold text-gray-900">{viewingReport.threshold}°C</span></p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-lg p-6 border-2 border-gray-200">
-                  <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">🕒 Time Coverage</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">🕒 Time Coverage</h3>
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm text-gray-600">Start Time</p>
-                      <p className="text-xl font-bold text-[#0071CE]">{viewingReport.times[0]}</p>
+                      <p className="text-xl font-bold text-blue-600">{viewingReport.times[0]}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">End Time</p>
-                      <p className="text-xl font-bold text-[#0071CE]">{viewingReport.times[viewingReport.times.length - 1]}</p>
+                      <p className="text-xl font-bold text-blue-600">{viewingReport.times[viewingReport.times.length - 1]}</p>
                     </div>
                     <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">Parameter: <span className="font-bold text-[#0B0B0B]">{viewingReport.parameter}</span></p>
+                      <p className="text-sm text-gray-600">Parameter: <span className="font-bold text-gray-900">{viewingReport.parameter}</span></p>
                     </div>
                   </div>
                 </div>
@@ -460,30 +470,30 @@ export default function ReportingPage() {
 
               {/* Key Insights */}
               <div className="bg-gradient-to-br from-blue-50 to-teal-50 rounded-lg p-6 border-2 border-[#0071CE] mb-6">
-                <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">💡 Key Insights</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">💡 Key Insights</h3>
                 <div className="space-y-3 text-sm">
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Data Range:</span> {viewingReport.parameter} readings range from <span className="font-bold text-[#00D9C0]">{Math.min(...viewingReport.values).toFixed(2)}°C</span> to <span className="font-bold text-[#FF6B35]">{Math.max(...viewingReport.values).toFixed(2)}°C</span>, with a variation of <span className="font-bold">{(Math.max(...viewingReport.values) - Math.min(...viewingReport.values)).toFixed(2)}°C</span>.
                   </p>
-                  <p className="text-[#0B0B0B]">
-                    • <span className="font-semibold">Average Performance:</span> The average {viewingReport.parameter.toLowerCase()} is <span className="font-bold text-[#7B68EE]">{(viewingReport.values.reduce((a,b) => a+b, 0) / viewingReport.values.length).toFixed(2)}°C</span>, which is <span className="font-bold">{(viewingReport.values.reduce((a,b) => a+b, 0) / viewingReport.values.length) >= viewingReport.threshold ? 'above' : 'below'}</span> the threshold of {viewingReport.threshold}°C.
+                  <p className="text-gray-900">
+                    • <span className="font-semibold">Average Performance:</span> The average {viewingReport.parameter.toLowerCase()} is <span className="font-bold text-[#7B68EE]">{(viewingReport.values.reduce((a, b) => a + b, 0) / viewingReport.values.length).toFixed(2)}°C</span>, which is <span className="font-bold">{(viewingReport.values.reduce((a, b) => a + b, 0) / viewingReport.values.length) >= viewingReport.threshold ? 'above' : 'below'}</span> the threshold of {viewingReport.threshold}°C.
                   </p>
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Status Overview:</span> Out of {viewingReport.values.length} total readings, <span className="font-bold text-[#00D9C0]">{viewingReport.values.filter(v => v >= viewingReport.threshold).length} readings ({((viewingReport.values.filter(v => v >= viewingReport.threshold).length / viewingReport.values.length) * 100).toFixed(1)}%)</span> are within normal range, and <span className="font-bold text-[#E94E4E]">{viewingReport.values.filter(v => v < viewingReport.threshold).length} readings ({((viewingReport.values.filter(v => v < viewingReport.threshold).length / viewingReport.values.length) * 100).toFixed(1)}%)</span> require notification.
                   </p>
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Trend Analysis:</span> The {viewingReport.parameter.toLowerCase()} data shows {(() => {
                       const firstHalf = viewingReport.values.slice(0, Math.floor(viewingReport.values.length / 2))
                       const secondHalf = viewingReport.values.slice(Math.floor(viewingReport.values.length / 2))
-                      const avgFirst = firstHalf.reduce((a,b) => a+b, 0) / firstHalf.length
-                      const avgSecond = secondHalf.reduce((a,b) => a+b, 0) / secondHalf.length
+                      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+                      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
                       const diff = (avgSecond - avgFirst).toFixed(2)
                       return avgSecond > avgFirst ? `an increasing trend (+${diff}°C)` : avgSecond < avgFirst ? `a decreasing trend (${diff}°C)` : 'a stable trend'
                     })()}, indicating {(() => {
                       const firstHalf = viewingReport.values.slice(0, Math.floor(viewingReport.values.length / 2))
                       const secondHalf = viewingReport.values.slice(Math.floor(viewingReport.values.length / 2))
-                      const avgFirst = firstHalf.reduce((a,b) => a+b, 0) / firstHalf.length
-                      const avgSecond = secondHalf.reduce((a,b) => a+b, 0) / secondHalf.length
+                      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+                      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
                       return avgSecond > avgFirst ? 'potential warming over time' : avgSecond < avgFirst ? 'gradual cooling over time' : 'consistent performance'
                     })()}.
                   </p>
@@ -546,13 +556,13 @@ export default function ReportingPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6">
               {/* Key Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 border-2 border-[#0071CE]">
                   <p className="text-sm text-gray-600 mb-1">Total Data Points</p>
-                  <p className="text-3xl font-bold text-[#0071CE]">{expandedCard.values.length}</p>
+                  <p className="text-3xl font-bold text-blue-600">{expandedCard.values.length}</p>
                 </div>
                 <div className="bg-gradient-to-br from-teal-50 to-white rounded-lg p-4 border-2 border-[#00D9C0]">
                   <p className="text-sm text-gray-600 mb-1">Minimum Value</p>
@@ -564,14 +574,14 @@ export default function ReportingPage() {
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-white rounded-lg p-4 border-2 border-[#7B68EE]">
                   <p className="text-sm text-gray-600 mb-1">Average Value</p>
-                  <p className="text-3xl font-bold text-[#7B68EE]">{(expandedCard.values.reduce((a,b) => a+b, 0) / expandedCard.values.length).toFixed(2)}°</p>
+                  <p className="text-3xl font-bold text-[#7B68EE]">{(expandedCard.values.reduce((a, b) => a + b, 0) / expandedCard.values.length).toFixed(2)}°</p>
                 </div>
               </div>
 
               {/* Status Breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="bg-white rounded-lg p-6 border-2 border-gray-200">
-                  <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">📊 Status Breakdown</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Status Breakdown</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2">
@@ -588,24 +598,24 @@ export default function ReportingPage() {
                       <span className="text-2xl font-bold text-[#E94E4E]">{expandedCard.values.filter(v => v < expandedCard.threshold).length}</span>
                     </div>
                     <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">Threshold: <span className="font-bold text-[#0B0B0B]">{expandedCard.threshold}°C</span></p>
+                      <p className="text-sm text-gray-600">Threshold: <span className="font-bold text-gray-900">{expandedCard.threshold}°C</span></p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-lg p-6 border-2 border-gray-200">
-                  <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">🕒 Time Coverage</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">🕒 Time Coverage</h3>
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm text-gray-600">Start Time</p>
-                      <p className="text-xl font-bold text-[#0071CE]">{expandedCard.times[0]}</p>
+                      <p className="text-xl font-bold text-blue-600">{expandedCard.times[0]}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">End Time</p>
-                      <p className="text-xl font-bold text-[#0071CE]">{expandedCard.times[expandedCard.times.length - 1]}</p>
+                      <p className="text-xl font-bold text-blue-600">{expandedCard.times[expandedCard.times.length - 1]}</p>
                     </div>
                     <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">Parameter: <span className="font-bold text-[#0B0B0B]">{expandedCard.parameter}</span></p>
+                      <p className="text-sm text-gray-600">Parameter: <span className="font-bold text-gray-900">{expandedCard.parameter}</span></p>
                     </div>
                   </div>
                 </div>
@@ -613,30 +623,30 @@ export default function ReportingPage() {
 
               {/* Key Insights */}
               <div className="bg-gradient-to-br from-blue-50 to-teal-50 rounded-lg p-6 border-2 border-[#0071CE]">
-                <h3 className="text-lg font-bold text-[#0B0B0B] mb-4">💡 Key Insights</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">💡 Key Insights</h3>
                 <div className="space-y-3 text-sm leading-relaxed">
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Data Range:</span> {expandedCard.parameter} readings range from <span className="font-bold text-[#00D9C0]">{Math.min(...expandedCard.values).toFixed(2)}°C</span> to <span className="font-bold text-[#FF6B35]">{Math.max(...expandedCard.values).toFixed(2)}°C</span>, with a variation of <span className="font-bold">{(Math.max(...expandedCard.values) - Math.min(...expandedCard.values)).toFixed(2)}°C</span>.
                   </p>
-                  <p className="text-[#0B0B0B]">
-                    • <span className="font-semibold">Average Performance:</span> The average {expandedCard.parameter.toLowerCase()} is <span className="font-bold text-[#7B68EE]">{(expandedCard.values.reduce((a,b) => a+b, 0) / expandedCard.values.length).toFixed(2)}°C</span>, which is <span className="font-bold">{(expandedCard.values.reduce((a,b) => a+b, 0) / expandedCard.values.length) >= expandedCard.threshold ? 'above' : 'below'}</span> the threshold of {expandedCard.threshold}°C.
+                  <p className="text-gray-900">
+                    • <span className="font-semibold">Average Performance:</span> The average {expandedCard.parameter.toLowerCase()} is <span className="font-bold text-[#7B68EE]">{(expandedCard.values.reduce((a, b) => a + b, 0) / expandedCard.values.length).toFixed(2)}°C</span>, which is <span className="font-bold">{(expandedCard.values.reduce((a, b) => a + b, 0) / expandedCard.values.length) >= expandedCard.threshold ? 'above' : 'below'}</span> the threshold of {expandedCard.threshold}°C.
                   </p>
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Status Overview:</span> Out of {expandedCard.values.length} total readings, <span className="font-bold text-[#00D9C0]">{expandedCard.values.filter(v => v >= expandedCard.threshold).length} readings ({((expandedCard.values.filter(v => v >= expandedCard.threshold).length / expandedCard.values.length) * 100).toFixed(1)}%)</span> are within normal range, and <span className="font-bold text-[#E94E4E]">{expandedCard.values.filter(v => v < expandedCard.threshold).length} readings ({((expandedCard.values.filter(v => v < expandedCard.threshold).length / expandedCard.values.length) * 100).toFixed(1)}%)</span> require notification.
                   </p>
-                  <p className="text-[#0B0B0B]">
+                  <p className="text-gray-900">
                     • <span className="font-semibold">Trend Analysis:</span> The {expandedCard.parameter.toLowerCase()} data shows {(() => {
                       const firstHalf = expandedCard.values.slice(0, Math.floor(expandedCard.values.length / 2))
                       const secondHalf = expandedCard.values.slice(Math.floor(expandedCard.values.length / 2))
-                      const avgFirst = firstHalf.reduce((a,b) => a+b, 0) / firstHalf.length
-                      const avgSecond = secondHalf.reduce((a,b) => a+b, 0) / secondHalf.length
+                      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+                      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
                       const diff = (avgSecond - avgFirst).toFixed(2)
                       return avgSecond > avgFirst ? `an increasing trend (+${diff}°C)` : avgSecond < avgFirst ? `a decreasing trend (${diff}°C)` : 'a stable trend'
                     })()}, indicating {(() => {
                       const firstHalf = expandedCard.values.slice(0, Math.floor(expandedCard.values.length / 2))
                       const secondHalf = expandedCard.values.slice(Math.floor(expandedCard.values.length / 2))
-                      const avgFirst = firstHalf.reduce((a,b) => a+b, 0) / firstHalf.length
-                      const avgSecond = secondHalf.reduce((a,b) => a+b, 0) / secondHalf.length
+                      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+                      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
                       return avgSecond > avgFirst ? 'potential warming over time' : avgSecond < avgFirst ? 'gradual cooling over time' : 'consistent performance'
                     })()}.
                   </p>
